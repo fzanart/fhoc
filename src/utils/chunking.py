@@ -24,7 +24,6 @@ def get_context_enriched_chunks(
             document_overview,
             chunk,
             i,
-            len(base_chunks),
             llm,
         )
 
@@ -37,23 +36,22 @@ def create_enriched_document(
     document_overview,
     chunk,
     chunk_id,
-    total_chunks,
     llm,
 ):
 
     metadata = {
         "chunk_id": chunk_id,
-        "total_chunks": total_chunks,
-        "chunk_size": len(chunk),
-        "chunk": chunk,
+        "chunk_length": len(chunk.page_content),
+        "start_index": chunk.metadata.get("start_index", 0),
+        "chunk": chunk.page_content,
         "document_summary": document_overview,
     }
 
-    chunk_summary = summarize_context(document_overview, chunk, llm)
+    chunk_summary = summarize_context(document_overview, chunk.page_content, llm)
 
     metadata["chunk_summary"] = chunk_summary
 
-    return Document(page_content=chunk, metadata=metadata)
+    return Document(page_content=chunk.page_content, metadata=metadata)
 
 
 def document_summary(document_text, llm):
@@ -100,6 +98,6 @@ def get_base_chunks(document_text, chunk_size, chunk_overlap):
         strip_whitespace=False,
     )
 
-    base_chunks = text_splitter.split_text(document_text)
+    base_chunks = text_splitter.create_documents([document_text])
 
     return base_chunks
