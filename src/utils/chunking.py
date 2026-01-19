@@ -10,16 +10,9 @@ def get_context_enriched_chunks(
     llm,
     chunk_size: int = 1000,
     chunk_overlap: int = 200,
-    window_size: int = 2,
 ):
 
-    text_splitter = RecursiveCharacterTextSplitter(
-        separators=["\n\n", "\n", ".", " "],  # Paragraph → Line → Sentence → Word
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-    )
-
-    base_chunks = text_splitter.split_text(document_text)
+    base_chunks = get_base_chunks(document_text, chunk_size, chunk_overlap)
 
     document_overview = document_summary(document_text, llm)
 
@@ -27,18 +20,11 @@ def get_context_enriched_chunks(
     for i, chunk in enumerate(base_chunks):
         print(f"Processing chunk {i+1}/{len(base_chunks)}")
 
-        context_chunks, window_start, window_end = get_context_window(
-            base_chunks, i, window_size
-        )
-
         doc = create_enriched_document(
             document_overview,
             chunk,
-            context_chunks,
             i,
             len(base_chunks),
-            window_start,
-            window_end,
             llm,
         )
 
@@ -50,27 +36,20 @@ def get_context_enriched_chunks(
 def create_enriched_document(
     document_overview,
     chunk,
-    context_chunks,
     chunk_id,
     total_chunks,
-    window_start,
-    window_end,
     llm,
 ):
-    context_text = " ".join(context_chunks)
 
     metadata = {
         "chunk_id": chunk_id,
         "total_chunks": total_chunks,
         "chunk_size": len(chunk),
-        "window_start_idx": window_start,
-        "window_end_idx": window_end - 1,
-        "has_context": len(context_chunks) > 0,
         "chunk": chunk,
         "document_summary": document_overview,
     }
 
-    chunk_summary = summarize_context(document_overview, context_text, llm)
+    chunk_summary = summarize_context(document_overview, chunk, llm)
 
     metadata["chunk_summary"] = chunk_summary
 
@@ -111,13 +90,16 @@ def summarize_context(document_overview, context_text, llm):
     return response.content
 
 
-def get_context_window(base_chunks, current_index, window_size):
-    window_start = max(0, current_index - window_size)
-    window_end = min(len(base_chunks), current_index + window_size + 1)
+def get_base_chunks(document_text, chunk_size, chunk_overlap):
 
-    window = base_chunks[window_start:window_end]
-    context_chunks = [
-        chunk for j, chunk in enumerate(window) if j != current_index - window_start
-    ]
+    text_splitter = RecursiveCharacterTextSplitter(
+        separators=["\n\n", "\n", ".", " "],  # Paragraph → Line → Sentence → Word
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        add_start_index=True,
+        strip_whitespace=False,
+    )
 
-    return context_chunks, window_start, window_end
+    base_chunks = text_splitter.split_text(document_text)
+
+    return base_chunks
