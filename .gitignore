@@ -8,3 +8,11 @@ wheels/
 
 # Virtual environments
 .venv
+service-account.json
+*.ipynb
+.ipynb_checkpoints/
+data/
+notebooks/
+.env
+.continue/
+.vscode/
