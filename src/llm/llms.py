@@ -14,7 +14,7 @@ google_llm = ChatGoogleGenerativeAI(
     max_tokens=128000,
     google_api_key=os.getenv("GEMINI_API_KEY"),
 )
-openai_llm = ChatOpenAI(model="gpt-5-mini-2025-08-07", temperature=0)
+#openai_llm = ChatOpenAI(model="gpt-5-mini-2025-08-07", temperature=0)
 
 google_search_tool = types.Tool(google_search=types.GoogleSearch())
 google_llm_pro = ChatGoogleGenerativeAI(
