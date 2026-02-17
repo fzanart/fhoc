@@ -2,7 +2,7 @@ import random
 from pathlib import Path
 from collections import namedtuple
 from langchain_core.prompts import PromptTemplate
-#from transformers import pipeline
+from transformers import pipeline
 from ..llm.llms import google_llm_with_search_tool, google_llm
 
 PROMPT_DIR = Path(__file__).parent.parent / "prompts"
@@ -57,8 +57,6 @@ class RebuttalStructure:
             llm=llm_with_search_tool,
         )
 
-        print(fact_chain)
-
         summary_chain = self.generate_chain(
             prompt_text=summary_prompt_text,
             llm=llm,
@@ -77,12 +75,10 @@ class RebuttalStructure:
         # --- Generate content ---
         opening_fact = fact_chain.invoke({"misinformation": misinformation})
 
-        print(opening_fact)
-
         summary = summary_chain.invoke({"misinformation": misinformation})
 
         # pick a random fallacy, definition form DEFINITIONS
-        fallacy = random.choice(DEFINITIONS)
+        fallacy = pipe(misinformation)[0].get("label")
         fallacy_definition = DEFINITIONS[fallacy]
 
         fallacy_explanation = fallacy_chain.invoke(
