@@ -2,7 +2,7 @@ import random
 from pathlib import Path
 from collections import namedtuple
 from langchain_core.prompts import PromptTemplate
-from pydantic import BaseModel
+from transformers import pipeline
 from ..llm.llms import google_llm_with_search_tool, google_llm
 
 PROMPT_DIR = Path(__file__).parent.parent / "prompts"
@@ -27,7 +27,7 @@ DEFINITIONS = {
     "slothful induction": "Ignoring relevant evidence when coming to a conclusion",
 }
 
-
+pipe = pipeline("text-classification", model="fzanartu/flicc")
 llm = google_llm
 llm_with_search_tool = google_llm_with_search_tool
 
@@ -82,7 +82,7 @@ class RebuttalStructure:
         summary = summary_chain.invoke({"misinformation": misinformation})
 
         # pick a random fallacy, definition form DEFINITIONS
-        fallacy = random.choice(list(DEFINITIONS.keys()))
+        fallacy = pipe(misinformation)[0].get("label")
         fallacy_definition = DEFINITIONS[fallacy]
 
         fallacy_explanation = fallacy_chain.invoke(
