@@ -116,7 +116,8 @@ with gr.Blocks() as demo:
         }
     )
 
-    gr.Markdown("## Gemini Multimodal Chat (LangChain + Gradio)")
+    gr.Markdown("## Fighting Harmful Online Communication (fhoc)")
+    gr.Markdown("An AI-based tool to detect and counter climate misinformation")
 
     with gr.Row():
         with gr.Row():
