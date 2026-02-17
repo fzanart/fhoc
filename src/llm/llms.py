@@ -12,6 +12,7 @@ google_llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
     temperature=0,
     max_tokens=128000,
+    google_api_key=os.getenv("GEMINI_API_KEY"),
 )
 openai_llm = ChatOpenAI(model="gpt-5-mini-2025-08-07", temperature=0)
 
@@ -20,6 +21,7 @@ google_llm_pro = ChatGoogleGenerativeAI(
     model="gemini-2.5-pro",
     temperature=0.0,
     max_tokens=128000,
+    google_api_key=os.getenv("GEMINI_API_KEY"),
 )
 
 google_llm_with_search_tool = google_llm.bind_tools(
