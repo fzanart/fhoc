@@ -1,3 +1,13 @@
+---
+license: mit
+title: fhoc
+sdk: gradio
+emoji: 🐨
+colorFrom: blue
+colorTo: red
+sdk_version: 6.5.1
+app_file: main.py
+---
 # Fighting Harmful Online Communication
 
 ## Supporting Climate Journalism in Australia: An AI-based tool to detect and counter climate misinformation
