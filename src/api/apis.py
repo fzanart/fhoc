@@ -3,7 +3,7 @@
 from pathlib import Path
 from langchain_core.prompts import PromptTemplate
 from pydantic import BaseModel, computed_field
-from ..llm.llms import google_llm, openai_llm
+from ..llm.llms import google_llm
 
 # Construct the path to the cards.md file
 current_file_path = Path(__file__).resolve()
@@ -48,7 +48,7 @@ def classify_text(text: str) -> CategoryResponse:
     prompt = PromptTemplate.from_template(
         cards_prompt + "\n\nUser Query:\n{query}\n\nResponse:"
     )
-    llm_with_structure = openai_llm.with_structured_output(CategoryResponse)
+    llm_with_structure = google_llm.with_structured_output(CategoryResponse)
 
     chain = prompt | llm_with_structure
     response = chain.invoke({"query": text})
