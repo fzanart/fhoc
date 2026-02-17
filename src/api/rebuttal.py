@@ -27,7 +27,7 @@ DEFINITIONS = {
     "slothful induction": "Ignoring relevant evidence when coming to a conclusion",
 }
 
-#pipe = pipeline("text-classification", model="fzanartu/flicc")
+pipe = pipeline("text-classification", model="fzanartu/flicc")
 llm = google_llm
 llm_with_search_tool = google_llm_with_search_tool
 
