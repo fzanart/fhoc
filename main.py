@@ -265,7 +265,4 @@ with gr.Blocks() as app:
     )
 
 if __name__ == "__main__":
-    app.launch(
-        server_name="127.0.0.1",  # Use 127.0.0.1 instead of 0.0.0.0 for Safari
-        server_port=7860,
-    )
+    app.launch()  # Use 127.0.0.1 instead of 0.0.0.0 for Safari
