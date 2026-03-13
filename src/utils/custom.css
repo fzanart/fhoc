@@ -1,0 +1,62 @@
+.text-container {
+    line-height: 1.8;
+    font-family: 'Segoe UI', sans-serif;
+    padding: 25px;
+    max-width: 800px;
+    margin: auto;
+    background: #fff;
+    border-radius: 10px;
+}
+
+.misinfo-trigger {
+    background-color: #fff3cd;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.3s;
+    display: block;          /* ← was inline, can't host block children */
+    position: relative;
+    border-radius: 4px;
+    padding: 2px 4px;
+    margin: 4px 0;
+}
+
+.misinfo-trigger:hover {
+    background-color: #ffeeba;
+}
+
+.rebuttal-content {
+    display: none;
+    width: 100%;
+    margin: 10px 0;
+    padding: 15px;
+    background-color: #f8d7da;
+    color: #721c24;
+    border-left: 5px solid #dc3545;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    font-style: italic;
+    box-sizing: border-box;
+}
+
+.misinfo-trigger:hover .rebuttal-content,
+.misinfo-trigger:focus-within .rebuttal-content {
+    display: block;
+}
+
+.rebuttal-label {
+    display: block;
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    margin-bottom: 5px;
+    color: #a94442;
+}
+
+.neutral-chunk {
+    margin: 4px 0;
+    padding: 2px 4px;
+}
+/* This ensures the markdown-generated paragraphs don't have massive margins */
+.text-container p {
+    margin: 0;
+}
