@@ -1,6 +1,5 @@
 """
-Simplified Gradio interface for misinformation detection.
-This is the minimal version for quick prototyping.
+Gradio interface for fighting harmful online communication (fhoc).
 """
 
 import asyncio
@@ -8,8 +7,13 @@ import logging
 import copy
 from pathlib import Path
 import gradio as gr
+import markdown
+import trafilatura
+from bs4 import BeautifulSoup
+import pypandoc
 from langchain_core.messages import HumanMessage
-from src.llm.llms import google_llm, google_llm_with_url_context
+from transformers import pipeline
+from src.llm.llms import google_llm
 from src.utils.parser_utils import clean_markdown, encode_pdf_to_base64
 from src.utils.chunking import get_base_chunks
 from src.api.apis import classify_text
@@ -20,6 +24,8 @@ transcription_prompt = Path("./src/prompts/md_transcript.md").read_text(
     encoding="utf-8"
 )
 
+custom_css = Path("./src/utils/custom.css").read_text(encoding="utf-8")
+
 logging.basicConfig(
     format="%(asctime)s %(levelname)s %(message)s",
     datefmt="%m/%d/%Y %I:%M:%S %p",
@@ -27,8 +33,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+pipe = pipeline("text-classification", model="fzanartu/flicc")
 
-async def analyze_chunks(prev_state):
+
+async def analyze_chunks(prev_state, progress=gr.Progress()):
+
+    logger.info("Starting chunk analysis")
+
     chunks = copy.deepcopy(prev_state["chunks"])
     by_id = {c["id"]: c for c in chunks}
 
@@ -36,116 +47,88 @@ async def analyze_chunks(prev_state):
         resp = await asyncio.to_thread(classify_text, chunk["text"])
         return chunk["id"], resp
 
+    progress(0.2, desc="Classifying text...")
     results = await asyncio.gather(*[classify(c) for c in chunks])
+
     rebuttal_gen = RebuttalStructure()
-    rebuttal_jobs = []
+    misinfo_chunks = []
+    zeros = ("0", "0.0", 0, 0.0)
 
     for chunk_id, resp in results:
+
+        logger.info(f"Chunk {chunk_id} classified: {resp.category}")
+
         chunk = by_id[chunk_id]
         chunk["CARDS_code"] = resp.category
         chunk["CARDS_category"] = resp.description
-        if resp.category != "0":
+        if resp.category not in zeros:
             chunk["has_misinformation"] = True
-            rebuttal_jobs.append(
-                (chunk_id, asyncio.to_thread(rebuttal_gen.run, chunk["text"]))
+            misinfo_chunks.append(chunk_id)
+
+    if misinfo_chunks:
+
+        texts = [by_id[i]["text"] for i in misinfo_chunks]
+
+        logger.info(f"Detecting fallacies for {len(texts)} chunks")
+
+        labels = pipe(texts)
+
+        for chunk_id, result in zip(misinfo_chunks, labels):
+            by_id[chunk_id]["fallacy"] = result["label"]
+
+        logger.info(f"Generating rebuttals for {len(misinfo_chunks)} chunks")
+        progress(0.5, desc="Generating rebuttals...")
+
+        rebuttal_jobs = [
+            (
+                chunk_id,
+                rebuttal_gen.run(by_id[chunk_id]["text"], by_id[chunk_id]["fallacy"]),
             )
-    rebuttals = await asyncio.gather(*[job for _, job in rebuttal_jobs])
+            for chunk_id in misinfo_chunks
+        ]
 
-    for (chunk_id, _), rebuttal in zip(rebuttal_jobs, rebuttals):
-        by_id[chunk_id]["rebuttal"] = rebuttal
+        rebuttal_results = await asyncio.gather(*[job for _, job in rebuttal_jobs])
 
-    marked_markdown = prev_state["raw_markdown"]
-    insertions = []
-    used_positions = set()
+        for (chunk_id, _), rebuttal in zip(rebuttal_jobs, rebuttal_results):
+            by_id[chunk_id]["rebuttal"] = rebuttal
 
-    for chunk in by_id.values():
-        if "rebuttal" in chunk:
-            start_idx = 0
-            while (idx := marked_markdown.find(chunk["text"], start_idx)) != -1:
-                end_pos = idx + len(chunk["text"])
-                if end_pos not in used_positions:
-                    insertions.append((end_pos, chunk["id"]))
-                    used_positions.add(end_pos)
-                    break
-                start_idx = idx + 1
-
-    for pos, c_id in sorted(insertions, key=lambda x: x[0], reverse=True):
-        marked_markdown = (
-            f"{marked_markdown[:pos]} [[REBUTTAL:{c_id}]] {marked_markdown[pos:]}"
-        )
-    return {
-        "raw_markdown": marked_markdown,
-        "chunks": list(by_id.values()),
-    }
+    return {"chunks": list(by_id.values())}
 
 
 def render_document(state):
-    chunks = [
-        {
-            "id": c["id"],
-            "text": c["text"],
-            "start": c["start"],
-            "end": c["end"],
-            "has_misinformation": c.get("has_misinformation", False),
-            "rebuttal": c.get("rebuttal", ""),
-            "CARDS_category": c.get("CARDS_category", ""),
-        }
-        for c in state["chunks"]
-    ]
+    # Your state['chunks'] logic is correct
+    html_output = '<div class="text-container">'
+    for chunk in state["chunks"]:
+        # Convert markdown text to HTML
+        text_html = markdown.markdown(chunk.get("text", ""))
+        is_bad = chunk.get("has_misinformation", False)
+        rebuttal = (
+            markdown.markdown(chunk.get("rebuttal"))
+            if isinstance(chunk.get("rebuttal"), str)
+            else ""
+        )
 
-    for i, chunk in enumerate(chunks):
-        chunk["overlap"] = 0 if i == 0 else chunks[i - 1]["end"] - chunk["start"]
-
-    doc_spans = ""
-    annotations = ""
-    n = 1
-
-    for chunk in chunks:
-        if chunk["has_misinformation"]:
-            doc_spans += (
-                f'<span style="background:#ffe0b2; border-bottom:2px solid orange;">'
-                f'{chunk["text"]}'
-                f'<sup style="color:orange; font-weight:bold;">[{n}]</sup>'
-                f"</span>"
-            )
-            annotations += (
-                f'<div style="border-left:3px solid orange; padding:8px 12px; margin-bottom:12px;'
-                f'background:#333; color:white; border-radius:4px; font-size:0.85em;">'
-                f'<strong style="color:orange;">[{n}] {chunk["CARDS_category"]}</strong><br>{chunk["rebuttal"]}'
-                f"</div>"
-            )
-            n += 1
+        if is_bad:
+            html_output += f"""
+            <div class="misinfo-trigger" tabindex="0">
+                {text_html}
+                <div class="rebuttal-content">
+                    <span class="rebuttal-label">⚠️ Rebuttal:</span>
+                    {rebuttal}
+                </div>
+            </div>"""
         else:
-            doc_spans += f'<span>{chunk["text"]}</span>'
+            html_output += f'<div class="neutral-chunk">{text_html}</div>'
 
-    doc_html = f'<div style="font-family:Georgia; line-height:1.8; color:#111;">{doc_spans}</div>'
-    ann_html = (
-        f'<div style="font-family:Georgia;">{annotations}</div>' if annotations else ""
-    )
-
-    return (
-        f'<div style="display:flex; gap:24px;">'
-        f'  <div style="flex:3">{doc_html}</div>'
-        f'  <div style="flex:1">{ann_html}</div>'
-        f"</div>"
-    )
-
-
-def stream_llm_markdown(message, prev_state, llm):
-    """Common logic to stream from Gemini and yield markdown updates."""
-    markdown = ""
-    for chunk in llm.stream([message]):
-        markdown += chunk.content
-        yield markdown, prev_state
-
-    # After streaming is done, final state processing
-    new_state = create_document_state(markdown)
-    yield new_state["raw_markdown"], new_state
+    html_output += "</div>"
+    return html_output
 
 
 def create_document_state(raw_markdown):
     """Common logic to clean markdown and create the doc_state dictionary."""
     cleaned = clean_markdown(raw_markdown)
+
+    logger.info(f"Markdown cleaned. Length: {len(cleaned)} characters")
 
     chunks = [
         {
@@ -159,29 +142,26 @@ def create_document_state(raw_markdown):
             "rebuttal": None,
         }
         for i, c in enumerate(
-            get_base_chunks(cleaned, chunk_size=1000, chunk_overlap=200)
+            get_base_chunks(cleaned, chunk_size=1000, chunk_overlap=0)
         )
     ]
 
-    return {
-        "raw_markdown": cleaned,
-        "chunks": chunks,
-    }
+    logger.info(f"Chunking complete. Total chunks: {len(chunks)}")
+
+    return {"chunks": chunks}
 
 
-def transcribe_pdf(file_obj, prev_state):
+# Changed to async def to handle the await calls natively
+async def transcribe_pdf(file_obj, progress=gr.Progress()):
     if not file_obj:
-        yield "Please upload a PDF.", prev_state
+        yield "Please upload a PDF.", {}
         return
 
     try:
-        file_size = Path(file_obj.name).stat().st_size
-        if file_size > 10 * 1024 * 1024:  # 10MB
-            yield "File is too large. Please upload a PDF smaller than 10MB.", prev_state
-            return
+        progress(0, desc="Extracting PDF text...")
+        yield "<p>Transcribing document...</p>", {}
 
         encoded_pdf = encode_pdf_to_base64(file_obj.name)
-
         message = HumanMessage(
             content=[
                 {"type": "text", "text": transcription_prompt},
@@ -189,80 +169,103 @@ def transcribe_pdf(file_obj, prev_state):
             ]
         )
 
-        yield from stream_llm_markdown(message, prev_state, google_llm)
+        raw_markdown = google_llm.invoke([message]).content
+
+        initial_state = create_document_state(raw_markdown)
+
+        # Call the async analyzer directly with await
+        final_state = await analyze_chunks(initial_state, progress=progress)
+
+        progress(0.9, desc="Rendering...")
+        # Return both the HTML for the UI and the final_state for the gr.State
+        yield render_document(final_state), final_state
+
     except Exception as e:
-        logger.error(f"Error processing PDF: {e}", exc_info=True)
-        yield "An error occurred while processing the PDF. Please try again.", prev_state
+        logger.error(f"Error: {e}", exc_info=True)
+        yield f"Error: {str(e)}", {}
 
 
-def process_url(url, prev_state):
+async def process_url(url, progress=gr.Progress()):
     if not url or not url.startswith("http"):
-        yield "Please enter a valid URL.", prev_state
+        yield "Please enter a valid URL."
         return
 
-    message = HumanMessage(
-        content=[
-            {"type": "text", "text": f"{transcription_prompt}\n\nURL: {url}"},
-        ]
-    )
+    # 1 download
+    logger.info(f"Processing {url}")
+    html = trafilatura.fetch_url(url)
 
-    yield from stream_llm_markdown(message, prev_state, google_llm_with_url_context)
+    # 2 extract main article as HTML
+    article_html = trafilatura.extract(
+        html,
+        output_format="html",
+        include_links=True,
+        include_tables=True,
+        include_comments=False,
+    )
+    if article_html and "request unsuccessful" not in article_html.lower():
+        # 3 clean unwanted links but keep citations
+        soup = BeautifulSoup(article_html, "html.parser")
+
+        for a in soup.find_all("a"):
+            href = a.get("href", "")
+
+            # keep footnotes and references
+            if href.startswith("#") or "footnote" in href:
+                continue
+
+            # unwrap navigation links
+            if not href.startswith("http"):
+                a.unwrap()
+
+        clean_html = str(soup)
+
+        # 4 convert to markdown (high fidelity)
+        raw_markdown = pypandoc.convert_text(
+            clean_html,
+            "markdown",
+            format="html",
+        )
+        logger.info(f"Received markdown {raw_markdown[:200]}")
+        initial_state = create_document_state(raw_markdown)
+
+        final_state = await analyze_chunks(initial_state, progress=progress)
+
+        progress(0.9, desc="Rendering...")
+        yield render_document(final_state), final_state
+
+    else:
+        yield "Request unsuccessful, failed to extract article content"
 
 
 with gr.Blocks() as app:
-
-    doc_state = gr.State(
-        {
-            "raw_markdown": "",
-            "chunks": [],
-        }
-    )
+    # doc_state is useful if you want to download the results later
+    doc_state = gr.State({"chunks": []})
 
     gr.Markdown("## Fighting Harmful Online Communication (fhoc)")
-    gr.Markdown("An AI-based tool to detect and counter climate misinformation")
 
     with gr.Tabs():
         with gr.TabItem("Upload PDF"):
-            input_file = gr.File(label="Upload PDF file", file_types=[".pdf"])
+            input_file = gr.File(label="Upload PDF", file_types=[".pdf"])
             file_submit_btn = gr.Button("Analyze", variant="primary")
         with gr.TabItem("Enter URL"):
             url_input = gr.Textbox(
                 label="Enter URL", placeholder="https://example.com/article"
             )
             url_submit_btn = gr.Button("Analyze", variant="primary")
+        # ... (URL tab stays the same) ...
 
-        with gr.Row():
-            output_text = gr.HTML(label="Analysis Results")
+        output_html = gr.HTML(label="Analysis Results")
 
-    # --- Path 1: PDF Upload ---
+    # Correct wiring: functions return (HTML, State)
     file_submit_btn.click(
-        fn=transcribe_pdf,
-        inputs=[input_file, doc_state],
-        outputs=[output_text, doc_state],
-    ).then(
-        fn=analyze_chunks,
-        inputs=doc_state,
-        outputs=doc_state,
-    ).then(
-        fn=render_document,
-        inputs=doc_state,
-        outputs=output_text,
+        fn=transcribe_pdf, inputs=[input_file], outputs=[output_html, doc_state]
     )
 
-    # --- Path 2: URL Input ---
     url_submit_btn.click(
-        fn=process_url,
-        inputs=[url_input, doc_state],
-        outputs=[output_text, doc_state],
-    ).then(
-        fn=analyze_chunks,
-        inputs=doc_state,
-        outputs=doc_state,
-    ).then(
-        fn=render_document,
-        inputs=doc_state,
-        outputs=output_text,
+        fn=process_url, inputs=[url_input], outputs=[output_html, doc_state]
     )
 
 if __name__ == "__main__":
-    app.launch()  # Use 127.0.0.1 instead of 0.0.0.0 for Safari
+    app.launch(
+        css=custom_css, theme=gr.themes.Monochrome()
+    )  # Use 127.0.0.1 instead of 0.0.0.0 for Safari
