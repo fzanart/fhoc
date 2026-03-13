@@ -1,4 +1,4 @@
-import random
+import asyncio
 from pathlib import Path
 from collections import namedtuple
 from langchain_core.prompts import PromptTemplate
@@ -36,13 +36,27 @@ class RebuttalStructure:
     def __init__(self):
         # hamburger-style structure:
         self.heading = namedtuple("Heading", ["name", "content"])
-        self.rebuttal = [
-            self.heading(name="Myth", content=None),
-            self.heading(name="##FACT", content=None),
-            self.heading(name="##MYTH", content=None),
-            self.heading(name="##FALLACY", content=None),
-            self.heading(name="##FACT", content=None),
-        ]
+
+        # --- Build chains ---
+        self.fact_chain = self.generate_chain(
+            prompt_text=fact_prompt_text,
+            llm=llm_with_search_tool,
+        )
+
+        self.summary_chain = self.generate_chain(
+            prompt_text=summary_prompt_text,
+            llm=llm,
+        )
+
+        self.fallacy_chain = self.generate_chain(
+            prompt_text=fallacy_prompt_text,
+            llm=llm,
+        )
+
+        self.closing_fact_chain = self.generate_chain(
+            prompt_text=closing_fact_prompt_text,
+            llm=llm,
+        )
 
     def generate_chain(self, prompt_text, llm):
         prompt = PromptTemplate.from_template(prompt_text)
@@ -50,56 +64,48 @@ class RebuttalStructure:
 
         return chain
 
-    def run(self, misinformation):
-        # --- Build chains ---
-        fact_chain = self.generate_chain(
-            prompt_text=fact_prompt_text,
-            llm=llm_with_search_tool,
-        )
+    async def run(self, misinformation, fallacy):
 
-        summary_chain = self.generate_chain(
-            prompt_text=summary_prompt_text,
-            llm=llm,
-        )
-
-        fallacy_chain = self.generate_chain(
-            prompt_text=fallacy_prompt_text,
-            llm=llm,
-        )
-
-        closing_fact_chain = self.generate_chain(
-            prompt_text=closing_fact_prompt_text,
-            llm=llm,
-        )
+        rebuttal = [
+            self.heading(name="Myth", content=None),
+            self.heading(name="###FACT", content=None),
+            self.heading(name="###MYTH", content=None),
+            self.heading(name="###FALLACY", content=None),
+            self.heading(name="###FACT", content=None),
+        ]
 
         # --- Generate content ---
-        opening_fact = fact_chain.invoke({"misinformation": misinformation})
+        opening_fact_task = self.fact_chain.ainvoke({"misinformation": misinformation})
+        summary_task = self.summary_chain.ainvoke({"misinformation": misinformation})
 
-        summary = summary_chain.invoke({"misinformation": misinformation})
+        opening_fact, summary = await asyncio.gather(
+            opening_fact_task,
+            summary_task,
+        )
 
-        # pick a random fallacy, definition form DEFINITIONS
-        fallacy = pipe(misinformation)[0].get("label")
+        # pick fallacy definition form DEFINITIONS
         fallacy_definition = DEFINITIONS[fallacy]
 
-        fallacy_explanation = fallacy_chain.invoke(
+        fallacy_task = self.fallacy_chain.ainvoke(
             {
                 "misinformation": misinformation,
                 "fallacy": fallacy,
                 "fallacy_definition": fallacy_definition,
-                "fact": opening_fact,
-            }
+                "fact": opening_fact.content,
+            },
         )
-        closing_fact = closing_fact_chain.invoke({"fact": opening_fact})
+
+        closing_task = self.closing_fact_chain.ainvoke({"fact": opening_fact.content})
+
+        fallacy_explanation, closing_fact = await asyncio.gather(
+            fallacy_task, closing_task
+        )
 
         # --- Populate rebuttal layers ---
-        self.rebuttal[1] = self.rebuttal[1]._replace(content=opening_fact.content)
-        self.rebuttal[2] = self.rebuttal[2]._replace(content=summary.content)
-        self.rebuttal[3] = self.rebuttal[3]._replace(
-            content=fallacy_explanation.content
-        )
-        self.rebuttal[4] = self.rebuttal[4]._replace(content=closing_fact.content)
+        rebuttal[1] = rebuttal[1]._replace(content=opening_fact.content)
+        rebuttal[2] = rebuttal[2]._replace(content=summary.content)
+        rebuttal[3] = rebuttal[3]._replace(content=fallacy_explanation.content)
+        rebuttal[4] = rebuttal[4]._replace(content=closing_fact.content)
 
         # --- Render final output ---
-        return "\n".join(
-            f"{layer.name}: {layer.content}" for layer in self.rebuttal[1:]
-        )
+        return "\n".join(f"{layer.name}\n{layer.content}" for layer in rebuttal[1:])
