@@ -234,7 +234,7 @@ async def process_url(url, progress=gr.Progress()):
         yield render_document(final_state), final_state
 
     else:
-        yield "Request unsuccessful, failed to extract article content"
+        yield "Request unsuccessful, failed to extract article content", {}
 
 
 with gr.Blocks() as app:
