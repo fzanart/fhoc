@@ -5,14 +5,18 @@ description = "An AI-based tool to detect and counter climate misinformation"
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 dependencies = [
+    "beautifulsoup4>=4.14.3",
     "google-genai>=1.56.0",
     "gradio>=6.2.0",
     "langchain>=1.2.0",
     "langchain-google-genai>=4.1.2",
     "langchain-text-splitters>=1.1.0",
+    "markdown>=3.10.2",
     "pip>=25.3",
+    "pypandoc>=1.16.2",
     "python-dotenv>=1.2.1",
     "torch>=2.10.0",
+    "trafilatura>=1.4.0",
     "transformers>=5.2.0",
 ]
 
