@@ -318,6 +318,7 @@ def render_narrative_html(result: dict) -> str:
 
     narrative_label = NARRATIVE_CLASSES.get(narrative.narrative).title()
     narrative_explanation = narrative.explanation
+
     for label in NARRATIVE_CLASSES.keys():
         narrative_explanation = narrative_explanation.replace(
             label, label.replace("_", " ").title()
@@ -327,7 +328,7 @@ def render_narrative_html(result: dict) -> str:
         ("🦸", "Hero", HVV_CLASSES.get(hvv.hero_class).title()),
         ("🦹", "Villain", HVV_CLASSES.get(hvv.villain_class).title()),
         ("😢", "Victim", HVV_CLASSES.get(hvv.victim_class).title()),
-        ("🎯", "Focus", hvv.focus),
+        ("🎯", "Focus", hvv.focus.title()),
         ("⚔️", "Conflict", conflict.conflict.replace("_", " ").title()),
         ("🏛️", "Cultural Story", story.story.title()),
     ]
