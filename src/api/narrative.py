@@ -316,12 +316,6 @@ def render_narrative_html(result: dict) -> str:
     conflict: ConflictResult = result["conflict"]
     narrative: NarrativeResult = result["narrative"]
 
-    hero = (HVV_CLASSES.get(hvv.hero_class),)
-    villain = (HVV_CLASSES.get(hvv.villain_class),)
-    victim = (HVV_CLASSES.get(hvv.victim_class),)
-    focus = (hvv.focus,)
-    conflict_label = conflict.conflict
-    story_label = story.story
     narrative_label = NARRATIVE_CLASSES.get(narrative.narrative).title()
     narrative_explanation = " ".join(
         key.replace("_", " ").capitalize() if key in NARRATIVE_CLASSES else word
@@ -330,12 +324,12 @@ def render_narrative_html(result: dict) -> str:
     )
 
     cards = [
-        ("🦸", "Hero", hero.title()),
-        ("🦹", "Villain", villain.title()),
-        ("😢", "Victim", victim.title()),
-        ("🎯", "Focus", focus.title()),
-        ("⚔️", "Conflict", conflict_label.replace("_", " ").title()),
-        ("🏛️", "Cultural Story", story_label.title()),
+        ("🦸", "Hero", HVV_CLASSES.get(hvv.hero_class).title()),
+        ("🦹", "Villain", HVV_CLASSES.get(hvv.villain_class).title()),
+        ("😢", "Victim", HVV_CLASSES.get(hvv.victim_class).title()),
+        ("🎯", "Focus", hvv.focus),
+        ("⚔️", "Conflict", conflict.conflict.replace("_", " ").title()),
+        ("🏛️", "Cultural Story", story.story.title()),
     ]
 
     cards_html = "\n".join(
