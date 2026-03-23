@@ -320,9 +320,9 @@ def render_narrative_html(result: dict) -> str:
     villain = (HVV_CLASSES.get(hvv.villain_class),)
     victim = (HVV_CLASSES.get(hvv.victim_class),)
     focus = (hvv.focus,)
-    conflict_label = (conflict.conflict,)
+    conflict_label = conflict.conflict
     story_label = story.story
-    narrative_label = (NARRATIVE_CLASSES.get(narrative.narrative)).title()
+    narrative_label = NARRATIVE_CLASSES.get(narrative.narrative).title()
     narrative_explanation = " ".join(
         key.replace("_", " ").capitalize() if key in NARRATIVE_CLASSES else word
         for word in narrative.explanation.split()
