@@ -65,6 +65,12 @@ NARRATIVE_CLASSES = {
     "ENDANGERED_SPECIES": """Endangered species (like polar bears) are the helpless victims of this narrative, who are seeing their habitat destroyed by the actions of villainous humans. The villain here can be government, legislation, industry, and the victim is environment and nature. The narrative focuses on victims and shows how they are endangered.""",
     "EVERY_LITTLE_HELPS": """This narrative presents a society which has transitioned to a sustainable 'green' way of life. Could be by portraying individuals as the protagonists of stories that propose solutions to climate change. The heroes here are individuals and common people, and it is implied that they are also a villain. The narrative focuses on hero and shows how they change their consumption.""",
     "GORE": """This is a narrative of scientific discovery which climaxes on the certainty that climate change is unequivocally caused by humans. The heroes here are scientists, the villain is government, general public, or industry pollution, and the victim is environment or climate change. The narrative focuses on villain and raises alarm.""",
+    "NO_STICKS": "No sticks just carrots - Society will only respond to supportive and voluntary policies restrictive measures will fail and should be abandoned.",
+    "OFFICIALS_DECLARE_EMERGENCY": "Officials declare a climate emergency - The climate crisis is sufficiently severe that it warrants declaring a climate emergency. This should occur at different levels of government as climate requires action at all levels, from the hyper-local to the global.",
+    "OTHERS_ARE_WORSE": "Others are worse than us - Other countries, cities or industries are worse than ourselves. There is no point for us to implement climate policies, because we only cause a small fraction of the emissions. As long as others emit even more than us, actions won't be effective.",
+    "TECHNOLOGICAL_OPTIMISM": "We should focus our efforts on current and future technologies, which will unlock great possibilities for addressing climate change.",
+    "VICTIM_BLAMING": "Individuals and consumers are ultimately responsible for taking actions to address climate change.",
+    "YOURE_DESTROYING_OUR_FUTURE": "The political stasis around climate change means that we cannot rely on politicians to create the change necessary. With collective action, even the politically weak can make a difference and secure a future for generations to come.",
 }
 
 FocusLabel = Literal["HERO", "VILLAIN", "VICTIM"]
@@ -317,14 +323,17 @@ def render_narrative_html(result: dict) -> str:
     narrative: NarrativeResult = result["narrative"]
 
     narrative_label = ": ".join(
-        [narrative.narrative, NARRATIVE_CLASSES.get(narrative.narrative)]
+        [
+            narrative.narrative.replace("_", " ").title(),
+            NARRATIVE_CLASSES.get(narrative.narrative),
+        ]
     )
     narrative_explanation = narrative.explanation
 
-    # for label in NARRATIVE_CLASSES.keys():
-    #     narrative_explanation = narrative_explanation.replace(
-    #         label, label.replace("_", " ").title()
-    #     )
+    for label in NARRATIVE_CLASSES.keys():
+        narrative_explanation = narrative_explanation.replace(
+            label, label.replace("_", " ").title()
+        )
 
     cards = [
         ("🦸", "Hero", HVV_CLASSES.get(hvv.hero_class).title()),
