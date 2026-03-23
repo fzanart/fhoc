@@ -12,6 +12,7 @@ dependencies = [
     "langchain-google-genai>=4.1.2",
     "langchain-text-splitters>=1.1.0",
     "markdown>=3.10.2",
+    "openai>=2.29.0",
     "pip>=25.3",
     "pypandoc>=1.16.2",
     "python-dotenv>=1.2.1",

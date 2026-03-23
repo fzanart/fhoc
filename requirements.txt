@@ -13,3 +13,4 @@ python-dotenv>=1.2.1
 torch>=2.10.0
 trafilatura>=1.4.0
 transformers>=5.2.0
+openai>=2.29.0
