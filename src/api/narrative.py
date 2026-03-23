@@ -54,7 +54,7 @@ CONFLICT_CLASSES = {
     "PREVENT_CONFLICT": "the article criticises measures, policies, or events that exacerbate the climate crisis; or it provides the evidence for the climate crisis.",
 }
 
-NARRATIVES_CLASSES = {
+NARRATIVE_CLASSES = {
     "12_YEARS": """12 Years to save the world - Past and present human action (or inaction) risks a catastrophic future climatic event unless people change their behaviour to mitigate climate change. The villain here is government or industry pollution, and the victim is environment, people, or climate change. The narratives focuses on villain and shows how they deny climate change or abandon climate policies.""",
     "ALL_GOING_TO_DIE": """We are all going to die - This narrative shows the current or potential catastrophic impact of climate change on people. The villain here is climate change or industry emissions, and the victim is general public. The narrative focuses on victim and raises the alarm.""",
     "ALL_TALK": """All talk little action - This narrative emphasises inconcistency between ambitious climate action targets and actual actions. The villain here is government and politicians, and the victim is often climate change. The narrative focuses on villain who reneged on their promise to support climate policies.""",
@@ -71,7 +71,7 @@ FocusLabel = Literal["HERO", "VILLAIN", "VICTIM"]
 StakeholderLabel = Literal[*HVV_CLASSES.keys()]
 StoryLabel = Literal[*STORY_CLASSES.keys()]
 ConflictLabel = Literal[*CONFLICT_CLASSES.keys()]
-NarrativeLabel = Literal[*NARRATIVES_CLASSES.keys()]
+NarrativeLabel = Literal[*NARRATIVE_CLASSES.keys()]
 
 # ---------------------------------------------------------------------------
 # Pydantic schemas for structured output
@@ -276,7 +276,7 @@ async def analyze_components(text: str) -> dict:
 
     narrative = await chain_narrative.ainvoke(
         {
-            "classes": _format_classes(NARRATIVES_CLASSES),
+            "classes": _format_classes(NARRATIVE_CLASSES),
             "text": text,
             "hero_class": (HVV_CLASSES.get(hvv.hero_class)).title(),
             "villain_class": (HVV_CLASSES.get(hvv.villain_class)).title(),
