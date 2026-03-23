@@ -55,7 +55,7 @@ CONFLICT_CLASSES = {
 }
 
 NARRATIVE_CLASSES = {
-    "12_YEARS": """12 Years to save the world - Past and present human action (or inaction) risks a catastrophic future climatic event unless people change their behaviour to mitigate climate change. The villain here is government or industry pollution, and the victim is environment, people, or climate change. The narratives focuses on villain and shows how they deny climate change or abandon climate policies.""",
+    "12_YEARS": """Past and present human action (or inaction) risks a catastrophic future climatic event unless people change their behaviour to mitigate climate change. The villain here is government or industry pollution, and the victim is environment, people, or climate change. The narratives focuses on villain and shows how they deny climate change or abandon climate policies.""",
     "ALL_GOING_TO_DIE": """We are all going to die - This narrative shows the current or potential catastrophic impact of climate change on people. The villain here is climate change or industry emissions, and the victim is general public. The narrative focuses on victim and raises the alarm.""",
     "ALL_TALK": """All talk little action - This narrative emphasises inconcistency between ambitious climate action targets and actual actions. The villain here is government and politicians, and the victim is often climate change. The narrative focuses on villain who reneged on their promise to support climate policies.""",
     "CARBON_EXPANSION": """Carbon-fuelled expansion - The free market is at the centre of this narrative which presents action on climate change as an obstacle to the freedom and well-being of citizens. The villain here is climate policies or green technologies, and the victim is general public or old industries. The narrative focuses on victim and advocates for abandoning climate policies.""",
@@ -316,21 +316,26 @@ def render_narrative_html(result: dict) -> str:
     conflict: ConflictResult = result["conflict"]
     narrative: NarrativeResult = result["narrative"]
 
-    hero = HVV_CLASSES.get(hvv.hero_class, hvv.hero_class)
-    villain = HVV_CLASSES.get(hvv.villain_class, hvv.villain_class)
-    victim = HVV_CLASSES.get(hvv.victim_class, hvv.victim_class)
-    focus = HVV_CLASSES.get(hvv.focus, hvv.focus)
-    conflict_label = CONFLICT_CLASSES.get(conflict.conflict, conflict.conflict)
-    story_label = STORY_CLASSES.get(story.story, story.story)
-    narrative_label = NARRATIVE_CLASSES.get(narrative.narrative, narrative.narrative)
+    hero = (HVV_CLASSES.get(hvv.hero_class),)
+    villain = (HVV_CLASSES.get(hvv.villain_class),)
+    victim = (HVV_CLASSES.get(hvv.victim_class),)
+    focus = (hvv.focus,)
+    conflict_label = (conflict.conflict,)
+    story_label = story.story
+    narrative_label = (NARRATIVE_CLASSES.get(narrative.narrative)).title()
+    narrative_explanation = " ".join(
+        key.replace("_", " ").capitalize() if key in NARRATIVE_CLASSES else word
+        for word in narrative.explanation.split()
+        for key in NARRATIVE_CLASSES.keys()
+    )
 
     cards = [
-        ("🦸", "Hero", hero),
-        ("🦹", "Villain", villain),
-        ("😢", "Victim", victim),
-        ("🎯", "Focus", focus),
-        ("⚔️", "Conflict", conflict_label),
-        ("🏛️", "Cultural Story", story_label),
+        ("🦸", "Hero", hero.title()),
+        ("🦹", "Villain", villain.title()),
+        ("😢", "Victim", victim.title()),
+        ("🎯", "Focus", focus.title()),
+        ("⚔️", "Conflict", conflict_label.replace("_", " ").title()),
+        ("🏛️", "Cultural Story", story_label.title()),
     ]
 
     cards_html = "\n".join(
@@ -443,7 +448,7 @@ def render_narrative_html(result: dict) -> str:
 
   <div class="nf-explanation">
     <div class="nf-explanation-title">Detailed Analysis</div>
-    <p class="nf-explanation-text">{narrative.explanation}</p>
+    <p class="nf-explanation-text">{narrative_explanation}</p>
   </div>
 </div>
 """
