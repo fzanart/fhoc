@@ -187,27 +187,33 @@ def _render_debunk(state: dict) -> str:
 
 
 def _make_handler(get_markdown, analysis_fn):
-    """
-    Factory that returns an async generator handler for a given
-    (extraction function, analysis function) pair.
-    """
-
-    async def handler(source, progress=gr.Progress()):
+    async def handler(source, state, progress=gr.Progress()):
         if not source:
             yield "Please provide an input.", {}
             return
         try:
+            # derive a stable cache key from whatever source type we have
+            source_key = source if isinstance(source, str) else source.name
+
+            if state and state.get("chunks") and state.get("_source") == source_key:
+                logger.info(f"Re-using cached state for: {source_key}")
+                html, final_state = await analysis_fn(state, progress)
+                yield html, final_state
+                return
+
             progress(0, desc="Extracting text...")
-            yield "<p>Extracting text...</p>", {}
+            yield "<p>Extracting text...</p>", state
             raw_markdown = get_markdown(source)
-            state = _state_from_markdown(raw_markdown)
+            new_state = _state_from_markdown(raw_markdown)
+            new_state["_source"] = source_key  # cache the key
             progress(0.3, desc="Running analysis...")
-            html, final_state = await analysis_fn(state, progress)
+            html, final_state = await analysis_fn(new_state, progress)
             progress(0.9, desc="Rendering...")
             yield html, final_state
+
         except Exception as e:
             logger.error(f"Error: {e}", exc_info=True)
-            yield f"<p>Error: {e}</p>", {}
+            yield f"<p>Error: {e}</p>", state
 
     return handler
 
@@ -250,16 +256,24 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Monochrome()) as app:
             output_url = gr.HTML(label="Analysis Results")
 
     pdf_debunk_btn.click(
-        fn=pdf_debunk_fn, inputs=[input_file], outputs=[output_pdf, doc_state]
+        fn=pdf_debunk_fn,
+        inputs=[input_file, doc_state],
+        outputs=[output_pdf, doc_state],
     )
     pdf_narrative_btn.click(
-        fn=pdf_narrative_fn, inputs=[input_file], outputs=[output_pdf, doc_state]
+        fn=pdf_narrative_fn,
+        inputs=[input_file, doc_state],
+        outputs=[output_pdf, doc_state],
     )
     url_debunk_btn.click(
-        fn=url_debunk_fn, inputs=[url_input], outputs=[output_url, doc_state]
+        fn=url_debunk_fn,
+        inputs=[url_input, doc_state],
+        outputs=[output_url, doc_state],
     )
     url_narrative_btn.click(
-        fn=url_narrative_fn, inputs=[url_input], outputs=[output_url, doc_state]
+        fn=url_narrative_fn,
+        inputs=[url_input, doc_state],
+        outputs=[output_url, doc_state],
     )
 
 
