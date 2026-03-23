@@ -317,11 +317,11 @@ def render_narrative_html(result: dict) -> str:
     narrative: NarrativeResult = result["narrative"]
 
     narrative_label = NARRATIVE_CLASSES.get(narrative.narrative).title()
-    narrative_explanation = " ".join(
-        key.replace("_", " ").capitalize() if key in NARRATIVE_CLASSES else word
-        for word in narrative.explanation.split()
-        for key in NARRATIVE_CLASSES.keys()
-    )
+    narrative_explanation = narrative.explanation
+    for label in NARRATIVE_CLASSES.keys():
+        narrative_explanation = narrative_explanation.replace(
+            label, label.replace("_", " ").title()
+        )
 
     cards = [
         ("🦸", "Hero", HVV_CLASSES.get(hvv.hero_class).title()),
