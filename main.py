@@ -186,28 +186,38 @@ def _render_debunk(state: dict) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _make_handler(get_markdown, analysis_fn):
+def _make_handler(get_markdown, analysis_fn, analysis_key):
+    """
+    analysis_key: "debunk" | "narrative" — identifies which result to cache.
+    """
+
     async def handler(source, state, progress=gr.Progress()):
         if not source:
-            yield "Please provide an input.", {}
+            yield "Please provide an input.", state
             return
         try:
-            # derive a stable cache key from whatever source type we have
             source_key = source if isinstance(source, str) else source.name
 
-            if state and state.get("chunks") and state.get("_source") == source_key:
-                logger.info(f"Re-using cached state for: {source_key}")
-                html, final_state = await analysis_fn(state, progress)
-                yield html, final_state
+            # Source changed — reset everything
+            if state.get("_source") != source_key:
+                logger.info(f"New source detected, resetting state: {source_key}")
+                progress(0, desc="Extracting text...")
+                yield "<p>Extracting text...</p>", state
+                raw_markdown = get_markdown(source)
+                state = _state_from_markdown(raw_markdown)
+                state["_source"] = source_key
+                state["_cache"] = {}  # fresh cache for both analyses
+
+            # Return cached result if available
+            if analysis_key in state.get("_cache", {}):
+                logger.info(f"Returning cached {analysis_key} result.")
+                yield state["_cache"][analysis_key], state
                 return
 
-            progress(0, desc="Extracting text...")
-            yield "<p>Extracting text...</p>", state
-            raw_markdown = get_markdown(source)
-            new_state = _state_from_markdown(raw_markdown)
-            new_state["_source"] = source_key  # cache the key
+            # Run analysis and cache result
             progress(0.3, desc="Running analysis...")
-            html, final_state = await analysis_fn(new_state, progress)
+            html, final_state = await analysis_fn(state, progress)
+            final_state.setdefault("_cache", {})[analysis_key] = html
             progress(0.9, desc="Rendering...")
             yield html, final_state
 
@@ -218,10 +228,10 @@ def _make_handler(get_markdown, analysis_fn):
     return handler
 
 
-pdf_debunk_fn = _make_handler(_markdown_from_pdf, _debunk)
-pdf_narrative_fn = _make_handler(_markdown_from_pdf, _narrative)
-url_debunk_fn = _make_handler(_markdown_from_url, _debunk)
-url_narrative_fn = _make_handler(_markdown_from_url, _narrative)
+pdf_debunk_fn = _make_handler(_markdown_from_pdf, _debunk, "debunk")
+pdf_narrative_fn = _make_handler(_markdown_from_pdf, _narrative, "narrative")
+url_debunk_fn = _make_handler(_markdown_from_url, _debunk, "debunk")
+url_narrative_fn = _make_handler(_markdown_from_url, _narrative, "narrative")
 
 
 # ---------------------------------------------------------------------------
