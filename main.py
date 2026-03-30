@@ -265,7 +265,7 @@ url_narrative_fn = _make_handler(_markdown_from_url, _narrative, "narrative")
 # UI
 # ---------------------------------------------------------------------------
 
-with gr.Blocks(css=custom_css, theme=gr.themes.Monochrome()) as app:
+with gr.Blocks() as app:
 
     doc_state = gr.State({"chunks": []})
     gr.Markdown("## Fighting Harmful Online Communication (fhoc)")
@@ -315,4 +315,4 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Monochrome()) as app:
 
 
 if __name__ == "__main__":
-    app.launch()
+    app.launch(css=custom_css, theme=gr.themes.Monochrome())
