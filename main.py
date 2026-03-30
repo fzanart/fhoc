@@ -19,6 +19,8 @@ from src.utils.chunking import get_base_chunks
 from src.api.cards import classify_text
 from src.api.rebuttal import RebuttalStructure
 from src.api.narrative import analyze_components, render_narrative_html
+from src.api.debunk import render_debunk_html
+from src.api.debunk_summary import generate_debunk_summary
 
 
 transcription_prompt = Path("./src/prompts/md_transcript.md").read_text(
@@ -146,7 +148,26 @@ async def _debunk(state: dict, progress: gr.Progress) -> tuple[str, dict]:
             by_id[chunk_id]["rebuttal"] = rebuttal
 
     final_state = {"chunks": list(by_id.values())}
-    return _render_debunk(final_state), final_state
+
+    progress(0.85, desc="Summarizing findings...")
+    full_text = "\n\n".join(c["text"] for c in chunks)
+    flicc_labels = list(
+        dict.fromkeys(
+            by_id[i]["fallacy"] for i in misinfo_chunks if by_id[i].get("fallacy")
+        )
+    )
+    cards_cats = list(
+        dict.fromkeys(
+            f'{by_id[i]["CARDS_code"]} — {by_id[i]["CARDS_category"]}'
+            for i in misinfo_chunks
+            if by_id[i].get("CARDS_code")
+        )
+    )
+    final_state["_debunk_summary"] = await generate_debunk_summary(
+        full_text, flicc_labels, cards_cats
+    )
+
+    return render_debunk_html(final_state), final_state
 
 
 async def _narrative(state: dict, progress: gr.Progress) -> tuple[str, dict]:
