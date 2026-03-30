@@ -17,7 +17,7 @@ PROMPT_DEBUNK_SUMMARY = ChatPromptTemplate.from_messages(
     [
         (
             "human",
-            """... FILL IN YOUR INSTRUCTION HERE ...
+            """Summarize the article concisely. Then, analyze how it employs the detected FLICC denial techniques and CARDS misinformation categories to mislead readers.
                                                                                                                                                         
 Article:
 {text}                                                                                                                                                 
