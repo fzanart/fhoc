@@ -71,7 +71,13 @@ def _markdown_from_pdf(file_obj) -> str:
     message = HumanMessage(
         content=[
             {"type": "text", "text": transcription_prompt},
-            {"type": "media", "mime_type": "application/pdf", "data": encoded_pdf},
+            {
+                "type": "file",
+                "file": {
+                    "filename": Path(file_obj.name).name,
+                    "file_data": f"data:application/pdf;base64,{encoded_pdf}",
+                },
+            },
         ]
     )
     return google_llm.invoke([message]).content
