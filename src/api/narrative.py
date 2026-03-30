@@ -336,12 +336,22 @@ def render_narrative_html(result: dict) -> str:
         )
 
     cards = [
-        ("🦸", "Hero", HVV_CLASSES.get(hvv.hero_class).title()),
-        ("🦹", "Villain", HVV_CLASSES.get(hvv.villain_class).title()),
-        ("😢", "Victim", HVV_CLASSES.get(hvv.victim_class).title()),
-        ("🎯", "Focus", hvv.focus.title()),
-        ("⚔️", "Conflict", conflict.conflict.replace("_", " ").title()),
-        ("🏛️", "Cultural Story", story.story.title()),
+        ("🦸", "Hero", HVV_CLASSES.get(hvv.hero_class).title(), ""),
+        ("🦹", "Villain", HVV_CLASSES.get(hvv.villain_class).title(), ""),
+        ("😢", "Victim", HVV_CLASSES.get(hvv.victim_class).title(), ""),
+        ("🎯", "Focus", hvv.focus.title(), ""),
+        (
+            "⚔️",
+            "Conflict",
+            conflict.conflict.replace("_", " ").title(),
+            CONFLICT_CLASSES.get(conflict.conflict, ""),
+        ),
+        (
+            "🏛️",
+            "Cultural Story",
+            story.story.title(),
+            STORY_CLASSES.get(story.story, ""),
+        ),
     ]
 
     cards_html = "\n".join(
@@ -350,8 +360,9 @@ def render_narrative_html(result: dict) -> str:
             <div class="nf-card-icon">{icon}</div>
             <div class="nf-card-label">{label}</div>
             <div class="nf-card-value">{value}</div>
+            {f'<div class="nf-card-explanation">{explanation}</div>' if explanation else ''}
         </div>"""
-        for icon, label, value in cards
+        for icon, label, value, explanation in cards
     )
 
     return f"""
@@ -438,6 +449,13 @@ def render_narrative_html(result: dict) -> str:
       line-height: 1.6;
       margin: 0;
   }}
+  .nf-card-explanation {{
+      font-size: 0.78em;
+      color: #6b7280;
+      font-style: italic;
+      margin-top: 4px;
+      line-height: 1.4;
+    }}
 </style>
 
 <div class="nf-wrapper">
