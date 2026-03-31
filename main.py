@@ -4,10 +4,8 @@ Gradio interface for fighting harmful online communication (fhoc).
 
 import asyncio
 import logging
-import copy
 from pathlib import Path
 import gradio as gr
-import markdown
 import trafilatura
 from bs4 import BeautifulSoup
 import pypandoc
@@ -111,28 +109,21 @@ def _state_from_markdown(raw_markdown: str) -> dict:
 
 
 async def _debunk(state: dict, progress: gr.Progress) -> tuple[str, dict]:
-    chunks = copy.deepcopy(state["chunks"])
+    chunks = [{**c} for c in state["chunks"]]
     by_id = {c["id"]: c for c in chunks}
-
-    async def classify(chunk):
-        resp = await asyncio.to_thread(classify_text, chunk["text"])
-        return chunk["id"], resp
-
-    progress(0.2, desc="Classifying claims...")
-    results = await asyncio.gather(*[classify(c) for c in chunks])
-
-    rebuttal_gen = RebuttalStructure()
-    misinfo_chunks = []
     zeros = ("0", "0.0", 0, 0.0, "0_0_0", "<0_0_0>")
 
-    for chunk_id, resp in results:
-        logger.info(f"Chunk {chunk_id} classified: {resp.category}")
-        chunk = by_id[chunk_id]
+    progress(0.2, desc="Classifying claims...")
+    resps = await asyncio.gather(*[asyncio.to_thread(classify_text, c["text"]) for c in chunks])
+
+    misinfo_chunks = []
+    for chunk, resp in zip(chunks, resps):
+        logger.info(f"Chunk {chunk['id']} classified: {resp.category}")
         chunk["CARDS_code"] = resp.category
         chunk["CARDS_category"] = resp.description
         if resp.category not in zeros:
             chunk["has_misinformation"] = True
-            misinfo_chunks.append(chunk_id)
+            misinfo_chunks.append(chunk["id"])
 
     full_text = "\n\n".join(c["text"] for c in chunks)
 
@@ -143,38 +134,22 @@ async def _debunk(state: dict, progress: gr.Progress) -> tuple[str, dict]:
         for chunk_id, result in zip(misinfo_chunks, labels):
             by_id[chunk_id]["fallacy"] = result["label"]
 
-        flicc_labels = list(
-            dict.fromkeys(
-                by_id[i]["fallacy"] for i in misinfo_chunks if by_id[i].get("fallacy")
-            )
-        )
-        cards_cats = list(
-            dict.fromkeys(
-                f'{by_id[i]["CARDS_code"]} — {by_id[i]["CARDS_category"]}'
-                for i in misinfo_chunks
-                if by_id[i].get("CARDS_code")
-            )
-        )
+        flicc_labels = list(dict.fromkeys(by_id[i]["fallacy"] for i in misinfo_chunks if by_id[i].get("fallacy")))
+        cards_cats = list(dict.fromkeys(f'{by_id[i]["CARDS_code"]} — {by_id[i]["CARDS_category"]}' for i in misinfo_chunks))
 
         progress(0.5, desc="Generating rebuttals...")
-        rebuttal_jobs = [
-            (
-                chunk_id,
-                rebuttal_gen.run(by_id[chunk_id]["text"], by_id[chunk_id]["fallacy"]),
-            )
-            for chunk_id in misinfo_chunks
-        ]
+        rebuttal_gen = RebuttalStructure()
+        coros = [rebuttal_gen.run(by_id[i]["text"], by_id[i]["fallacy"]) for i in misinfo_chunks]
         *rebuttal_results, debunk_summary = await asyncio.gather(
-            *[job for _, job in rebuttal_jobs],
+            *coros,
             generate_debunk_summary(full_text, flicc_labels, cards_cats),
         )
-        for (chunk_id, _), rebuttal in zip(rebuttal_jobs, rebuttal_results):
+        for chunk_id, rebuttal in zip(misinfo_chunks, rebuttal_results):
             by_id[chunk_id]["rebuttal"] = rebuttal
     else:
         debunk_summary = await generate_debunk_summary(full_text, [], [])
 
     final_state = {"chunks": list(by_id.values()), "_debunk_summary": debunk_summary}
-
     return render_debunk_html(final_state), final_state
 
 
@@ -183,31 +158,6 @@ async def _narrative(state: dict, progress: gr.Progress) -> tuple[str, dict]:
     text = "\n\n".join(c["text"] for c in state["chunks"])
     result = await analyze_components(text)
     return render_narrative_html(result), state
-
-
-def _render_debunk(state: dict) -> str:
-    html_output = '<div class="text-container">'
-    for chunk in state["chunks"]:
-        text_html = markdown.markdown(chunk.get("text", ""))
-        is_bad = chunk.get("has_misinformation", False)
-        rebuttal = (
-            markdown.markdown(chunk.get("rebuttal"))
-            if isinstance(chunk.get("rebuttal"), str)
-            else ""
-        )
-        if is_bad:
-            html_output += f"""
-            <div class="misinfo-trigger" tabindex="0">
-                {text_html}
-                <div class="rebuttal-content">
-                    <span class="rebuttal-label">⚠️ Rebuttal:</span>
-                    {rebuttal}
-                </div>
-            </div>"""
-        else:
-            html_output += f'<div class="neutral-chunk">{text_html}</div>'
-    html_output += "</div>"
-    return html_output
 
 
 # ---------------------------------------------------------------------------
@@ -232,7 +182,7 @@ def _make_handler(get_markdown, analysis_fn, analysis_key):
                 logger.info(f"New source detected, resetting state: {source_key}")
                 progress(0, desc="Extracting text...")
                 yield "<p>Extracting text...</p>", state
-                raw_markdown = get_markdown(source)
+                raw_markdown = await asyncio.to_thread(get_markdown, source)
                 state = _state_from_markdown(raw_markdown)
                 state["_source"] = source_key
                 state["_cache"] = {}  # fresh cache for both analyses
