@@ -134,12 +134,27 @@ async def _debunk(state: dict, progress: gr.Progress) -> tuple[str, dict]:
             chunk["has_misinformation"] = True
             misinfo_chunks.append(chunk_id)
 
+    full_text = "\n\n".join(c["text"] for c in chunks)
+
     if misinfo_chunks:
         texts = [by_id[i]["text"] for i in misinfo_chunks]
         logger.info(f"Detecting fallacies for {len(texts)} chunks")
-        labels = pipe(texts)
+        labels = await asyncio.to_thread(pipe, texts)
         for chunk_id, result in zip(misinfo_chunks, labels):
             by_id[chunk_id]["fallacy"] = result["label"]
+
+        flicc_labels = list(
+            dict.fromkeys(
+                by_id[i]["fallacy"] for i in misinfo_chunks if by_id[i].get("fallacy")
+            )
+        )
+        cards_cats = list(
+            dict.fromkeys(
+                f'{by_id[i]["CARDS_code"]} — {by_id[i]["CARDS_category"]}'
+                for i in misinfo_chunks
+                if by_id[i].get("CARDS_code")
+            )
+        )
 
         progress(0.5, desc="Generating rebuttals...")
         rebuttal_jobs = [
@@ -149,29 +164,16 @@ async def _debunk(state: dict, progress: gr.Progress) -> tuple[str, dict]:
             )
             for chunk_id in misinfo_chunks
         ]
-        rebuttal_results = await asyncio.gather(*[job for _, job in rebuttal_jobs])
+        *rebuttal_results, debunk_summary = await asyncio.gather(
+            *[job for _, job in rebuttal_jobs],
+            generate_debunk_summary(full_text, flicc_labels, cards_cats),
+        )
         for (chunk_id, _), rebuttal in zip(rebuttal_jobs, rebuttal_results):
             by_id[chunk_id]["rebuttal"] = rebuttal
+    else:
+        debunk_summary = await generate_debunk_summary(full_text, [], [])
 
-    final_state = {"chunks": list(by_id.values())}
-
-    progress(0.85, desc="Summarizing findings...")
-    full_text = "\n\n".join(c["text"] for c in chunks)
-    flicc_labels = list(
-        dict.fromkeys(
-            by_id[i]["fallacy"] for i in misinfo_chunks if by_id[i].get("fallacy")
-        )
-    )
-    cards_cats = list(
-        dict.fromkeys(
-            f'{by_id[i]["CARDS_code"]} — {by_id[i]["CARDS_category"]}'
-            for i in misinfo_chunks
-            if by_id[i].get("CARDS_code")
-        )
-    )
-    final_state["_debunk_summary"] = await generate_debunk_summary(
-        full_text, flicc_labels, cards_cats
-    )
+    final_state = {"chunks": list(by_id.values()), "_debunk_summary": debunk_summary}
 
     return render_debunk_html(final_state), final_state
 
