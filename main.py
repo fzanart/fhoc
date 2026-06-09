@@ -14,12 +14,11 @@ from transformers import pipeline
 from src.llm.llms import google_llm
 from src.utils.parser_utils import clean_markdown, encode_pdf_to_base64
 from src.utils.chunking import get_base_chunks
-from src.api.cards import classify_text
+from src.api.apis import classify_text
 from src.api.rebuttal import RebuttalStructure
 from src.api.narrative import analyze_components, render_narrative_html
 from src.api.debunk import render_debunk_html
 from src.api.debunk_summary import generate_debunk_summary
-
 
 transcription_prompt = Path("./src/prompts/md_transcript.md").read_text(
     encoding="utf-8"
@@ -114,7 +113,9 @@ async def _debunk(state: dict, progress: gr.Progress) -> tuple[str, dict]:
     zeros = ("0", "0.0", 0, 0.0, "0_0_0", "<0_0_0>")
 
     progress(0.2, desc="Classifying claims...")
-    resps = await asyncio.gather(*[asyncio.to_thread(classify_text, c["text"]) for c in chunks])
+    resps = await asyncio.gather(
+        *[asyncio.to_thread(classify_text, c["text"]) for c in chunks]
+    )
 
     misinfo_chunks = []
     for chunk, resp in zip(chunks, resps):
@@ -134,12 +135,24 @@ async def _debunk(state: dict, progress: gr.Progress) -> tuple[str, dict]:
         for chunk_id, result in zip(misinfo_chunks, labels):
             by_id[chunk_id]["fallacy"] = result["label"]
 
-        flicc_labels = list(dict.fromkeys(by_id[i]["fallacy"] for i in misinfo_chunks if by_id[i].get("fallacy")))
-        cards_cats = list(dict.fromkeys(f'{by_id[i]["CARDS_code"]} — {by_id[i]["CARDS_category"]}' for i in misinfo_chunks))
+        flicc_labels = list(
+            dict.fromkeys(
+                by_id[i]["fallacy"] for i in misinfo_chunks if by_id[i].get("fallacy")
+            )
+        )
+        cards_cats = list(
+            dict.fromkeys(
+                f'{by_id[i]["CARDS_code"]} — {by_id[i]["CARDS_category"]}'
+                for i in misinfo_chunks
+            )
+        )
 
         progress(0.5, desc="Generating rebuttals...")
         rebuttal_gen = RebuttalStructure()
-        coros = [rebuttal_gen.run(by_id[i]["text"], by_id[i]["fallacy"]) for i in misinfo_chunks]
+        coros = [
+            rebuttal_gen.run(by_id[i]["text"], by_id[i]["fallacy"])
+            for i in misinfo_chunks
+        ]
         *rebuttal_results, debunk_summary = await asyncio.gather(
             *coros,
             generate_debunk_summary(full_text, flicc_labels, cards_cats),
