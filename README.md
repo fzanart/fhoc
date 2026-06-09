@@ -14,8 +14,6 @@ app_file: main.py
 
 The project "Supporting Climate Journalism in Australia: An AI-based tool to detect and counter climate misinformation" is part of a University of Melbourne Hallmark Research Initiative on "Fighting Harmful Online Communication". This project aims to combat this issue through designing an AI model that identifies and corrects problematic climate content in long written and oral text. The goal is to support journalists sift through their sources, e.g. governmental reports, scientific articles, podcast episodes, and recognize climate-related misinformation, biased frames, or false balance.
 
-
-
 ```mermaid
 flowchart TD
     User([User]) --> UI[Gradio Web UI]
@@ -32,10 +30,10 @@ flowchart TD
     Clean --> Chunk["get_base_chunks()\n1,000-char chunks"]
     Chunk --> BtnChoice{Analysis selected}
 
-    subgraph Analyses[" "]
+    subgraph Analyses [ ]
         direction TB
 
-        subgraph Debunk["🔍 Claim Debunking"]
+        subgraph Debunk [🔍 Claim Debunking]
             direction TB
             D1["CARDS API · DiscourseLab\nClassify all chunks in parallel"]
             D1 --> D2{Misinformation\nfound?}
@@ -46,7 +44,7 @@ flowchart TD
             D5 --> D6
         end
 
-        subgraph Narrative["📰 Narrative Framing"]
+        subgraph Narrative [📰 Narrative Framing]
             direction TB
             N1["Pass 1 — 3 concurrent classifiers · Openrouter LLM"]
             N1 --> N1a["HVV: Hero / Villain / Victim"]
@@ -57,8 +55,8 @@ flowchart TD
         end
     end
 
-    BtnChoice --> |"Claim Debunking"| Debunk
-    BtnChoice --> |"Narrative Framing"| Narrative
+    BtnChoice --> |Claim Debunking| Debunk
+    BtnChoice --> |Narrative Framing| Narrative
     Debunk --> Output[HTML Results]
     Narrative --> Output
 ```
@@ -102,9 +100,4 @@ FHOC/
 │       ├── chunking.py          # Text chunking utilities
 │       ├── custom.css           # Gradio custom styles
 │       └── parser_utils.py      # Text parsing utilities
-├── data/
-│   ├── raw/                     # Original PDF source files
-│   ├── md/                      # Converted markdown versions
-│   └── json/                    # Processed JSON outputs
-└── notebooks/                   # Jupyter exploration notebooks
 ```

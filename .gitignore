@@ -16,3 +16,4 @@ notebooks/
 .env
 .continue/
 .vscode/
+.claude/
